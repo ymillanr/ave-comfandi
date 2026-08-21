@@ -15,11 +15,16 @@
   #resultado { margin-top: 20px; }
   .card { background: #fff; border-radius: 9px; padding: 18px 20px;
            box-shadow: 0 2px 8px rgba(0,0,0,.1); }
-  .campo { margin: 7px 0; font-size: .94em; line-height: 1.4; }
-  .label { font-weight: bold; color: #444; min-width: 90px; display: inline-block; }
+  .seccion { margin: 12px 0 4px; font-size: .8em; font-weight: bold;
+              color: #1F4E78; text-transform: uppercase; letter-spacing: .05em;
+              border-bottom: 1px solid #e0e8f0; padding-bottom: 3px; }
+  .campo { margin: 5px 0; font-size: .93em; line-height: 1.5; }
+  .label { font-weight: bold; color: #555; min-width: 90px; display: inline-block; }
   .sin { color: #c0392b; font-weight: bold; }
   .ok { color: #27ae60; font-weight: bold; }
+  .vacio { color: #bbb; font-style: italic; }
   a { color: #1F4E78; }
+  a:hover { text-decoration: underline; }
   .btn { display: inline-block; margin-top: 16px; padding: 11px 22px;
           background: #1F4E78; color: #fff; text-decoration: none;
           border-radius: 7px; font-size: .95em; font-weight: bold; }
@@ -42,18 +47,39 @@ const FU = 'https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=7RAcgZj40Ee
 const QC = 'r8610b71c6a13478ea4267c7002e9dd1d';
 const QK = 'r111ce01392134723a93c69dea55a5ecf';
 const QE = 'r1a6dde06b47d4bf2b563fb621b089a90';
-function enc(v) { return encodeURIComponent(v || ''); }
+
+function limpiar(v) {
+  if (v === null || v === undefined) return '';
+  const s = String(v).trim();
+  return (s === '' || s.toLowerCase() === 'nan' || s.toLowerCase() === 'none') ? '' : s;
+}
+function enc(v) { return encodeURIComponent(limpiar(v)); }
 function tel(v) {
-  return v ? '<a href="tel:' + v + '">' + v + '</a>' : '<span class="sin">—</span>';
+  const s = limpiar(v);
+  return s ? '<a href="tel:' + s + '">' + s + '</a>' : '<span class="vacio">—</span>';
 }
 function mail(v) {
-  return v ? ' &nbsp;|&nbsp; ✉ <a href="mailto:' + v + '">' + v + '</a>' : '';
+  const s = limpiar(v);
+  return s ? ' &nbsp;|&nbsp; ✉ <a href="mailto:' + s + '">' + s + '</a>' : '';
 }
+function contacto(nombre, movil, telefono, email) {
+  const n = limpiar(nombre);
+  const m = limpiar(movil);
+  const t = limpiar(telefono);
+  const e = limpiar(email);
+  if (!n && !m && !t && !e) return '<span class="vacio">Sin datos</span>';
+  let html = (n || '<span class="vacio">Sin nombre</span>');
+  if (m || t) html += ' &nbsp;|&nbsp; 📱 ' + tel(m) + ' / ' + tel(t);
+  if (e) html += ' &nbsp;|&nbsp; ✉ <a href="mailto:' + e + '">' + e + '</a>';
+  return html;
+}
+
 let timer;
 document.getElementById('busqueda').addEventListener('input', function() {
   clearTimeout(timer);
   timer = setTimeout(() => buscar(this.value.trim()), 300);
 });
+
 function buscar(cod) {
   const res = document.getElementById('resultado');
   const nf  = document.getElementById('not-found');
@@ -61,27 +87,28 @@ function buscar(cod) {
   const r = idx[cod];
   if (!r) { res.innerHTML = ''; nf.style.display = 'block'; return; }
   nf.style.display = 'none';
+
   const url = FU + '&' + QC + '=' + enc(r['Colegio'])
                  + '&' + QK + '=' + enc(r['Código'])
                  + '&' + QE + '=' + enc(r['Estudiante']);
-  const sin = r['Estado de contacto'] === 'Sin contacto en Click';
-  const dir = [r['Dirección'], r['Barrio']].filter(Boolean).join(' · Barrio: ');
+
+  const sinContacto = limpiar(r['Estado de contacto']) === 'Sin contacto en Click';
+  const dir = [limpiar(r['Dirección']), limpiar(r['Barrio'])].filter(Boolean).join(' – Barrio: ');
+
   res.innerHTML =
     '<div class="card">'
-    + '<div class="campo"><span class="label">Estudiante</span> ' + r['Estudiante'] + '</div>'
-    + '<div class="campo"><span class="label">Grado / Grupo</span> ' + r['Grado'] + ' ' + r['Grupo'] + '</div>'
+    + '<div class="seccion">Estudiante</div>'
+    + '<div class="campo"><span class="label">Nombre</span> ' + limpiar(r['Estudiante']) + '</div>'
+    + '<div class="campo"><span class="label">Grado / Grupo</span> ' + limpiar(r['Grado']) + ' – ' + limpiar(r['Grupo']) + '</div>'
     + (dir ? '<div class="campo"><span class="label">Dirección</span> ' + dir + '</div>' : '')
-    + '<div class="campo"><span class="label">Padre</span> '
-      + (r['Padre - Nombre'] || '—')
-      + ' &nbsp;|&nbsp; Móvil: ' + tel(r['Padre - Móvil'])
-      + ' / Fijo: ' + tel(r['Padre - Teléfono'])
-      + mail(r['Padre - Email']) + '</div>'
-    + '<div class="campo"><span class="label">Madre</span> '
-      + (r['Madre - Nombre'] || '—')
-      + ' &nbsp;|&nbsp; Móvil: ' + tel(r['Madre - Móvil'])
-      + ' / Fijo: ' + tel(r['Madre - Teléfono'])
-      + mail(r['Madre - Email']) + '</div>'
-    + (sin ? '<div class="campo sin">⚠ Sin contacto registrado en Click</div>' : '')
+    + (sinContacto ? '<div class="campo sin">⚠ Sin contacto registrado en Click</div>' : '')
+
+    + '<div class="seccion">Padre / Acudiente</div>'
+    + '<div class="campo">' + contacto(r['Padre - Nombre'], r['Padre - Móvil'], r['Padre - Teléfono'], r['Padre - Email']) + '</div>'
+
+    + '<div class="seccion">Madre / Acudiente</div>'
+    + '<div class="campo">' + contacto(r['Madre - Nombre'], r['Madre - Móvil'], r['Madre - Teléfono'], r['Madre - Email']) + '</div>'
+
     + '<a class="btn" href="' + url + '" target="_blank">📋 Abrir formulario</a>'
     + '</div>';
 }
